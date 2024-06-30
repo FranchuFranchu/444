@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <title>hello-wasm example</title>
+  </head>
+  <body>
+    <script type="module">
+      window.Game = {}
+      Game.difficulty = -1
+      function createGrid(cl) {
+        // Create the grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateColumns = 'repeat(4, 1fr)';
+        gridContainer.style.gridTemplateRows = 'repeat(4, 1fr)';
+        gridContainer.style.gap = '5px'; // Optional: add some gap between cells
+        gridContainer.style.width = '200px'; // Optional: set a width for the grid
+        gridContainer.style.height = '200px'; // Optional: set a height for the grid
+
+        // Iterate over rows and columns to create cells
+        for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                // Create a cell
+                const cell = document.createElement('div');
+                cell.style.border = '1px solid black'; // Optional: add border to cells
+                cell.style.display = 'flex';
+                cell.style.width = '40px';
+                cell.style.height = '40px';
+                cell.style.alignItems = 'center';
+                cell.style.justifyContent = 'center';
+                cell.style.background = '#f0f0f0'; // Optional: set a background color
+
+                // Set the cell's class to its coordinates
+                cell.className = `x-${row} y-${col} ` + cl;
+
+                // Append the cell to the grid container
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        return gridContainer
+      }
+      Game.update_difficulty = function() {
+        let d = document.getElementById("difficulty").value
+        document.getElementById("difficulty-show").innerText = d
+        Game.difficulty = parseInt(d)
+      }
+      Game.new_state_div = function(cl) {
+        const multipleGridsContainer = document.createElement('div');
+        multipleGridsContainer.style.display = 'flex';
+        multipleGridsContainer.style.gap = '10px'; // Optional: add some gap between grids
+        multipleGridsContainer.style.justifyContent = 'center'; // Center the grids horizontally
+        multipleGridsContainer.style.alignItems = 'center'; // Center the grids vertically
+    
+
+        for (let z = 0; z < 4; z++) {
+            multipleGridsContainer.appendChild(createGrid(`z-${z} ` + cl));
+        }
+
+        return multipleGridsContainer;
+      }
+      Game.play_ai = function() {
+        Game.interface.play_ai(Game.difficulty)
+        Game.update_board()
+      }
+      Game.play_at = function(x, y) {
+        Game.interface.play_at(x, y);
+        Game.update_board()
+      }
+      Game.undo = function() {
+        Game.interface.undo()
+        Game.update_board()
+      }
+      Game.fillin_state = function(cl,state,buttons) {
+        for (let x = 0; x < 4; x++) {
+          for (let y = 0; y < 4; y++) {
+            var placed_button = false;
+            for (let z = 0; z < 4; z++) {
+              let cell = document.querySelector(`.x-${x}.y-${y}.z-${z}` + cl)
+              cell.style.color = '#000000'
+              let tile = state.wasm_clone().get_at(x, y, z)
+              cell.style.background = '#f0f0f0';
+              if(tile === undefined) {
+                cell.innerHTML = ""
+                if(!placed_button && buttons) {
+                  placed_button = true;
+                  // Create the button element
+                  const button = document.createElement('button');
+                  
+                  // Set the button's text content
+                  button.textContent = 'J';
+                  button.style.width = '100%';
+                  button.style.height = '100%';
+
+                  // Add an event listener to the button to call the alert function when clicked
+                  button.addEventListener('click', function() {
+                      Game.play_at(x, y)
+                  });
+
+                  // Append the button to the body or any other container
+                  cell.appendChild(button);
+                } else {
+                }
+              } else if(tile === true) {
+                cell.style.background = '#493911'; // Optional: set a background 
+                cell.style.color = '#ffffff'
+                cell.innerHTML = "X"
+              } else if(tile === false) {
+                cell.style.background = '#e2d5b3'; // Optional: set a background 
+                cell.innerHTML = "O"
+              }
+            }
+          }
+        }
+
+      }
+      Game.update_board = function() {
+        let winner = Game.interface.winner();
+        let winner_div = document.getElementById("winner");
+        winner_div.innerHTML = ""
+        if (winner) {
+          let team = winner["0"] ? "X" : "O"
+          let state = winner["1"]
+          let e = document.createElement("span")
+          e.innerText = `El juego terminó. Ganó ${team}`
+          document.getElementById("winner").appendChild(e)
+          document.getElementById("winner").appendChild(Game.new_state_div("winner-board"));
+          Game.fillin_state(".winner-board",state,false)
+        }
+        let last = Game.interface.get_last()
+        Game.fillin_state(".main-board",last,true)
+      }
+
+      import init, { Interface } from "./pkg/cuatro_cuatro_cuatro.js";
+      init().then(() => {
+        Game.interface = new Interface()
+        Game.interface.history_len()
+        document.getElementById("state").appendChild(Game.new_state_div("main-board"));
+        Game.update_board()
+      });
+    </script>
+    <div id="main" style="margin: auto 0 auto 0;">
+      <div id="state">
+      </div>
+      <div id="buttons" style="display: flex; justify-content: center; align-items: center; gap: 5px">
+        <button onclick="Game.play_ai()">Jugar con IA</button>
+        <button onclick="Game.undo()">Deshacer</button>
+        <span>Dificultad: </span>
+        <span id="difficulty-show">-1</span>
+        <input type="range" name="" oninput="Game.update_difficulty()" id="difficulty" min="-3" max="2">
+      </div>
+      <div id="winner" style="display: flex; justify-content: center; flex-direction: column; align-items: center; gap: 5px">
+        
+      </div>
+    </div>
+  </body>
+</html>
