@@ -161,10 +161,14 @@
         window.location.hash = "#" + s
       }
       Game.load = function(base64) {
-        console.log(base64)
         if(base64.length != 0) {
+          Game.reset()
           Game.interface.from_base64(base64)
         }
+      }
+      Game.reset = function() {
+        Game.interface = new Interface()
+        Game.update_board()
       }
       Game.load_from_field = () => {
         Game.load(document.getElementById('cargar').value)
@@ -194,6 +198,7 @@
         <button onclick="Game.save_to_url()">Guardar</button>
         <input type="text" id="cargar"/>
         <button onclick="Game.load_from_field()">Cargar</button>
+        <button onclick="Game.reset()">Reiniciar</button>
       </div>
       <div id="winner">
         
