@@ -1,16 +1,13 @@
 #![feature(const_trait_impl, iter_from_coroutine, coroutines, coroutine_clone)]
 
-use std::{collections::HashSet, f64::{INFINITY, NEG_INFINITY}, io::{Read, Write}, ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr}};
-
-use wasm_bindgen::prelude::wasm_bindgen;
+use std::collections::HashSet;
 
 use crate::state::State;
 
-pub mod state;
 pub mod interface;
+pub mod state;
 
-fn main_2() {
-
+fn _count() {
     for depth in 0.. {
         let mut set = HashSet::new();
         for i in State::empty().recurse_children(depth) {

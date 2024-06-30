@@ -20,13 +20,18 @@ export class Interface {
 */
   player_id(): boolean;
 /**
+* @param {number} diff
 */
-  play_ai(): void;
+  play_ai(diff: number): void;
 /**
 * @param {number} x
 * @param {number} y
 */
   play_at(x: number, y: number): void;
+/**
+* @param {State} state
+*/
+  push(state: State): void;
 /**
 * @returns {State | undefined}
 */
@@ -117,8 +122,9 @@ export interface InitOutput {
   readonly interface_history_len: (a: number) => number;
   readonly interface_get_last: (a: number) => number;
   readonly interface_player_id: (a: number) => number;
-  readonly interface_play_ai: (a: number, b: number) => void;
+  readonly interface_play_ai: (a: number, b: number, c: number) => void;
   readonly interface_play_at: (a: number, b: number, c: number, d: number) => void;
+  readonly interface_push: (a: number, b: number) => void;
   readonly interface_undo: (a: number) => number;
   readonly interface_undo_to: (a: number, b: number) => void;
   readonly interface_peek: (a: number, b: number) => number;

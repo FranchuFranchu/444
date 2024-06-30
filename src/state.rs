@@ -1,5 +1,7 @@
-
-use std::{collections::HashSet, f64::{INFINITY, NEG_INFINITY}, io::{Read, Write}, ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr}};
+use std::{
+    f64::{INFINITY, NEG_INFINITY},
+    ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr},
+};
 
 use wasm_bindgen::prelude::*;
 /// Layout:
@@ -9,8 +11,6 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 #[derive(Hash, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct State(pub u64, pub u64);
-
-const DEPTH: usize = 4;
 
 impl const BitAnd for State {
     type Output = Self;
@@ -69,10 +69,10 @@ impl core::fmt::Debug for State {
         for i in 0..64 {
             if i != 0 {
                 if i % 16 == 0 {
-                    f.write_str(" ");
+                    f.write_str(" ")?;
                 }
                 if i % 4 == 0 {
-                    f.write_str(" ");
+                    f.write_str(" ")?;
                 }
             }
             f.write_str(match (p & 1, v & 1) {
@@ -81,17 +81,17 @@ impl core::fmt::Debug for State {
                 (1, 0) => "0",
                 (1, 1) => "1",
                 _ => todo!(),
-            });
+            })?;
             p >>= 1;
             v >>= 1;
-        };
+        }
         Ok(())
     }
 }
 
 #[wasm_bindgen]
 impl State {
-	#[wasm_bindgen(constructor)]
+    #[wasm_bindgen(constructor)]
     pub fn empty() -> Self {
         Self::default()
     }
@@ -99,20 +99,20 @@ impl State {
         self.clone()
     }
     pub fn get_at(self, x: u8, y: u8, z: u8) -> Option<bool> {
-    	let s = (self & Self::xyz_mask(x, y, z));
-    	match (s.count_own() > 0, s.flip_team().count_own() > 0) {
-    		(false, true) => Some(false),
-    		(true, false) => Some(true),
-    		_ => None,
-    	}
+        let s = self & Self::xyz_mask(x, y, z);
+        match (s.count_own() > 0, s.flip_team().count_own() > 0) {
+            (false, true) => Some(false),
+            (true, false) => Some(true),
+            _ => None,
+        }
     }
     pub fn set_at(self, x: u8, y: u8, z: u8, val: Option<bool>) -> State {
-    	let p = Self::xyz_mask(x, y, z).0;
-    	match val {
-		    Some(true) => self | Self(p, p),
-		    Some(false) => self & Self(p, !p) | Self(p, 0) ,
-		    None => self & Self(!p, !p),
-		}
+        let p = Self::xyz_mask(x, y, z).0;
+        match val {
+            Some(true) => self | Self(p, p),
+            Some(false) => self & Self(p, !p) | Self(p | self.0, 0),
+            None => self & Self(!p, !p),
+        }
     }
 }
 impl State {
@@ -123,19 +123,13 @@ impl State {
         Self(pl, u64::MAX)
     }
     pub fn x_mask(x: u8) -> Self {
-        Self::pl_mask(
-            0x1111_1111_1111_1111,
-        ) << x.into()
+        Self::pl_mask(0x1111_1111_1111_1111) << x.into()
     }
     pub fn y_mask(y: u8) -> Self {
-        Self::pl_mask(
-            0x000F_000F_000F_000F,
-        ) << (y * 4).into()
+        Self::pl_mask(0x000F_000F_000F_000F) << (y * 4).into()
     }
     pub fn z_mask(z: u8) -> Self {
-        Self::pl_mask(
-            0x0000_0000_0000_FFFF,
-        ) << (z * 16).into()
+        Self::pl_mask(0x0000_0000_0000_FFFF) << (z * 16).into()
     }
     pub fn xyz_mask(x: u8, y: u8, z: u8) -> Self {
         Self::x_mask(x) & Self::y_mask(y) & Self::z_mask(z)
@@ -169,12 +163,36 @@ impl State {
                     yield Self::y_mask(y) & Self::z_mask(z);
                 }
             }
-            let x_z_diag = (0..4).zip(0..4).map(|(x, y)| Self::x_mask(x) & Self::z_mask(y)).reduce(|a, b| a | b).unwrap();
-            let x_z_diag_anti = (0..4).zip((0..4).rev()).map(|(x, y)| Self::x_mask(x) & Self::z_mask(y)).reduce(|a, b| a | b).unwrap();
-            let x_y_diag = (0..4).zip(0..4).map(|(x, y)| Self::x_mask(x) & Self::y_mask(y)).reduce(|a, b| a | b).unwrap();
-            let x_y_diag_anti = (0..4).zip((0..4).rev()).map(|(x, y)| Self::x_mask(x) & Self::y_mask(y)).reduce(|a, b| a | b).unwrap();
-            let y_z_diag = (0..4).zip(0..4).map(|(x, y)| Self::y_mask(x) & Self::z_mask(y)).reduce(|a, b| a | b).unwrap();
-            let y_z_diag_anti = (0..4).zip((0..4).rev()).map(|(x, y)| Self::y_mask(x) & Self::z_mask(y)).reduce(|a, b| a | b).unwrap();
+            let x_z_diag = (0..4)
+                .zip(0..4)
+                .map(|(x, y)| Self::x_mask(x) & Self::z_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            let x_z_diag_anti = (0..4)
+                .zip((0..4).rev())
+                .map(|(x, y)| Self::x_mask(x) & Self::z_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            let x_y_diag = (0..4)
+                .zip(0..4)
+                .map(|(x, y)| Self::x_mask(x) & Self::y_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            let x_y_diag_anti = (0..4)
+                .zip((0..4).rev())
+                .map(|(x, y)| Self::x_mask(x) & Self::y_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            let y_z_diag = (0..4)
+                .zip(0..4)
+                .map(|(x, y)| Self::y_mask(x) & Self::z_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            let y_z_diag_anti = (0..4)
+                .zip((0..4).rev())
+                .map(|(x, y)| Self::y_mask(x) & Self::z_mask(y))
+                .reduce(|a, b| a | b)
+                .unwrap();
             for z in 0..4 {
                 yield Self::z_mask(z) & x_y_diag;
                 yield Self::z_mask(z) & x_y_diag_anti;
@@ -187,10 +205,30 @@ impl State {
                 yield Self::x_mask(x) & y_z_diag;
                 yield Self::x_mask(x) & y_z_diag_anti;
             }
-            yield (0..4).zip(0..4).zip(0..4).map(|((x, y), z)| Self::xyz_mask(x, y, z)).reduce(|a, b| a | b).unwrap();
-            yield ((0..4).rev()).zip(0..4).zip(0..4).map(|((x, y), z)| Self::xyz_mask(x, y, z)).reduce(|a, b| a | b).unwrap();
-            yield (0..4).zip((0..4).rev()).zip(0..4).map(|((x, y), z)| Self::xyz_mask(x, y, z)).reduce(|a, b| a | b).unwrap();
-            yield ((0..4).rev()).zip((0..4).rev()).zip(0..4).map(|((x, y), z)| Self::xyz_mask(x, y, z)).reduce(|a, b| a | b).unwrap();
+            yield (0..4)
+                .zip(0..4)
+                .zip(0..4)
+                .map(|((x, y), z)| Self::xyz_mask(x, y, z))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            yield ((0..4).rev())
+                .zip(0..4)
+                .zip(0..4)
+                .map(|((x, y), z)| Self::xyz_mask(x, y, z))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            yield (0..4)
+                .zip((0..4).rev())
+                .zip(0..4)
+                .map(|((x, y), z)| Self::xyz_mask(x, y, z))
+                .reduce(|a, b| a | b)
+                .unwrap();
+            yield ((0..4).rev())
+                .zip((0..4).rev())
+                .zip(0..4)
+                .map(|((x, y), z)| Self::xyz_mask(x, y, z))
+                .reduce(|a, b| a | b)
+                .unwrap();
             ()
         })
     }
@@ -210,7 +248,9 @@ impl State {
         }
     }
     pub fn play_at_team(self, team: bool, x: u8, y: u8) -> Option<State> {
-        self.cond_flip(team).play_at(x, y).map(|x| x.cond_flip(team))
+        self.cond_flip(team)
+            .play_at(x, y)
+            .map(|x| x.cond_flip(team))
     }
     pub fn children_own(self) -> impl Iterator<Item = Self> {
         std::iter::from_coroutine(move || {
@@ -220,13 +260,13 @@ impl State {
                         yield e;
                     }
                 }
-            };
+            }
         })
     }
     pub fn children_they(self) -> impl Iterator<Item = Self> {
         self.flip_team().children_own().map(|x| x.flip_team())
     }
-    pub fn recurse_children(self, depth: usize)  -> impl Iterator<Item = Self> {
+    pub fn recurse_children(self, depth: usize) -> impl Iterator<Item = Self> {
         std::iter::from_coroutine(Box::new(move || {
             for i in self.children_own() {
                 if depth == 0 {
@@ -239,7 +279,7 @@ impl State {
             }
         }))
     }
-    pub fn recurse_children_flip(self, depth: usize)  -> impl Iterator<Item = Self> {
+    pub fn recurse_children_flip(self, depth: usize) -> impl Iterator<Item = Self> {
         std::iter::from_coroutine(Box::new(move || {
             for i in self.flip_team().children_own() {
                 if depth == 0 {
@@ -260,12 +300,18 @@ impl State {
             return -INFINITY;
         }
         if depth == 0 {
-            return eval(self)
+            return eval(self);
         } else {
             if own {
-                self.children_own().map(|x| x.score(eval, depth - 1, !own)).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()
+                self.children_own()
+                    .map(|x| x.score(eval, depth - 1, !own))
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap()
             } else {
-                self.children_they().map(|x| x.score(eval, depth - 1, !own)).min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()
+                self.children_they()
+                    .map(|x| x.score(eval, depth - 1, !own))
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap()
             }
         }
     }
@@ -301,16 +347,20 @@ impl State {
         tot
     }
     pub fn choose_next(self, diff: isize) -> Option<State> {
-    	let dep = if self.count_own() < 10 {
-    		4 + diff
-    	} else if self.count_own() < 15 {
-    		5 + diff
-    	} else if self.count_own() < 25 {
-    		6 + diff
-    	} else {
-    		7 + diff
-    	};
-        self.children_own().max_by(|a, b| a.score(&|x| x.eval(), dep.unsigned_abs(), false).partial_cmp(&b.score(&|x| x.eval(), dep.unsigned_abs(), false)).unwrap())
+        let dep = if self.count_own() < 10 {
+            4 + diff
+        } else if self.count_own() < 15 {
+            5 + diff
+        } else if self.count_own() < 25 {
+            6 + diff
+        } else {
+            7 + diff
+        };
+        self.children_own().max_by(|a, b| {
+            a.score(&|x| x.eval(), dep.unsigned_abs(), false)
+                .partial_cmp(&b.score(&|x| x.eval(), dep.unsigned_abs(), false))
+                .unwrap()
+        })
     }
     pub fn winner(self) -> Option<bool> {
         if self.did_we_win() {
@@ -327,12 +377,14 @@ impl State {
             for z in 0..4 {
                 for x in 0..4 {
                     let mask = self & Self::xyz_mask(x, y, z);
-                    s.push_str(match (mask.count_own() > 0, mask.flip_team().count_own() > 0) {
-                        (false, false) => "-",
-                        (false, true) => "X",
-                        (true, false) => "O",
-                        _ => todo!(),
-                    });
+                    s.push_str(
+                        match (mask.count_own() > 0, mask.flip_team().count_own() > 0) {
+                            (false, false) => "-",
+                            (false, true) => "O",
+                            (true, false) => "X",
+                            _ => todo!(),
+                        },
+                    );
                 }
                 s.push_str(" ");
             }

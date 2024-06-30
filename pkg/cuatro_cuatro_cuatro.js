@@ -114,11 +114,12 @@ export class Interface {
         return ret !== 0;
     }
     /**
+    * @param {number} diff
     */
-    play_ai() {
+    play_ai(diff) {
         try {
             const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-            wasm.interface_play_ai(retptr, this.__wbg_ptr);
+            wasm.interface_play_ai(retptr, this.__wbg_ptr, diff);
             var r0 = getInt32Memory0()[retptr / 4 + 0];
             var r1 = getInt32Memory0()[retptr / 4 + 1];
             if (r1) {
@@ -144,6 +145,14 @@ export class Interface {
         } finally {
             wasm.__wbindgen_add_to_stack_pointer(16);
         }
+    }
+    /**
+    * @param {State} state
+    */
+    push(state) {
+        _assertClass(state, State);
+        var ptr0 = state.__destroy_into_raw();
+        wasm.interface_push(this.__wbg_ptr, ptr0);
     }
     /**
     * @returns {State | undefined}

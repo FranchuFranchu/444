@@ -3,21 +3,27 @@
   <head>
     <meta charset="utf-8" />
     <title>hello-wasm example</title>
+    <style type="text/css">
+      #main, body, html {
+        width: 100%;
+      }
+    </style>
   </head>
   <body>
     <script type="module">
       window.Game = {}
       Game.difficulty = -1
       function createGrid(cl) {
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0)
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0)
+        console.log(vw, vh)
+        let cell_size = '' + '70' + 'px';
         // Create the grid container
         const gridContainer = document.createElement('div');
         gridContainer.style.display = 'grid';
         gridContainer.style.gridTemplateColumns = 'repeat(4, 1fr)';
         gridContainer.style.gridTemplateRows = 'repeat(4, 1fr)';
         gridContainer.style.gap = '5px'; // Optional: add some gap between cells
-        gridContainer.style.width = '200px'; // Optional: set a width for the grid
-        gridContainer.style.height = '200px'; // Optional: set a height for the grid
-
         // Iterate over rows and columns to create cells
         for (let row = 0; row < 4; row++) {
             for (let col = 0; col < 4; col++) {
@@ -25,8 +31,8 @@
                 const cell = document.createElement('div');
                 cell.style.border = '1px solid black'; // Optional: add border to cells
                 cell.style.display = 'flex';
-                cell.style.width = '40px';
-                cell.style.height = '40px';
+                cell.style.width = cell_size;
+                cell.style.height = cell_size;
                 cell.style.alignItems = 'center';
                 cell.style.justifyContent = 'center';
                 cell.style.background = '#f0f0f0'; // Optional: set a background color
@@ -49,9 +55,12 @@
       Game.new_state_div = function(cl) {
         const multipleGridsContainer = document.createElement('div');
         multipleGridsContainer.style.display = 'flex';
-        multipleGridsContainer.style.gap = '10px'; // Optional: add some gap between grids
+        multipleGridsContainer.style.gap = '15px'; // Optional: add some gap 
+        multipleGridsContainer.style.padding = '10px';
+        multipleGridsContainer.style.width = '100%';
         multipleGridsContainer.style.justifyContent = 'center'; // Center the grids horizontally
         multipleGridsContainer.style.alignItems = 'center'; // Center the grids vertically
+        multipleGridsContainer.style.flexWrap = 'wrap';
     
 
         for (let z = 0; z < 4; z++) {
@@ -113,7 +122,6 @@
             }
           }
         }
-
       }
       Game.update_board = function() {
         let winner = Game.interface.winner();
@@ -132,11 +140,78 @@
         Game.fillin_state(".main-board",last,true)
       }
 
-      import init, { Interface } from "./pkg/cuatro_cuatro_cuatro.js";
+      import init, { Interface, State } from "./pkg/cuatro_cuatro_cuatro.js";
+      Game.save = function(state) {
+        const byteArray = new Uint8Array(16);
+
+        for (let z = 0; z < 4; z++) {
+          for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 4; x++) {
+              let bit_offset = x + (y % 2) * 4
+              let byte_offset = Math.floor(y / 2) + z * 2
+              let place = state.wasm_clone().get_at(x,y,z)
+              if (place !== undefined) {
+                byteArray[byte_offset+8] |= (place << bit_offset)
+                byteArray[byte_offset] |= (1 << bit_offset)
+              }
+
+            }
+          }
+        }
+        let binaryString = '';
+        for (let i = 0; i < byteArray.length; i++) {
+            binaryString += String.fromCharCode(byteArray[i]);
+        }
+        return btoa(unescape(encodeURIComponent(binaryString)))
+      }
+      Game.save_to_url = function() {
+        let s = Game.save(Game.interface.get_last())
+        document.getElementById('cargar').value = s
+        window.location.hash = "#" + s
+      }
+      Game.load = function(base64) {
+        console.log(base64)
+        let state = new State()
+
+        // Decode the base64 string to a binary string
+        const binaryString = decodeURIComponent(escape(atob(base64)));
+
+        // Create a byte array of the appropriate length
+        const byteArray = new Uint8Array(16);
+
+        // Convert the binary string to a byte array
+        for (let i = 0; i < binaryString.length; i++) {
+            byteArray[i] = binaryString.charCodeAt(i);
+        }
+
+        for (let z = 0; z < 4; z++) {
+          for (let y = 0; y < 4; y++) {
+            for (let x = 0; x < 4; x++) {
+              let bit_offset = Math.trunc(x + (y % 2) * 4)
+              let byte_offset = Math.floor(y / 2) + z * 2
+              let present = (byteArray[byte_offset] & (1 << bit_offset)) != 0
+              let team = (byteArray[byte_offset+8] & (1 << bit_offset)) != 0
+              state = state.set_at(x,y,z,
+                present ? team : undefined
+              )
+            }
+          }
+        }
+        return state
+      }
+      Game.load_from_field = () => {
+        Game.interface.push(Game.load(document.getElementById('cargar').value))
+        Game.update_board()
+      }
       init().then(() => {
         Game.interface = new Interface()
-        Game.interface.history_len()
         document.getElementById("state").appendChild(Game.new_state_div("main-board"));
+        try {
+          let s = window.location.hash.slice(1)
+          Game.interface.push(Game.load(s))
+        } catch (e) {
+          console.error(e)
+        }
         Game.update_board()
       });
     </script>
@@ -149,6 +224,9 @@
         <span>Dificultad: </span>
         <span id="difficulty-show">-1</span>
         <input type="range" name="" oninput="Game.update_difficulty()" id="difficulty" min="-3" max="2">
+        <button onclick="Game.save_to_url()">Guardar</button>
+        <input type="text" id="cargar"/>
+        <button onclick="Game.load_from_field()">Cargar</button>
       </div>
       <div id="winner" style="display: flex; justify-content: center; flex-direction: column; align-items: center; gap: 5px">
         
