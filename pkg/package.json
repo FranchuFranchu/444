@@ -1,0 +1,14 @@
+{
+  "name": "cuatro-cuatro-cuatro",
+  "version": "0.1.0",
+  "files": [
+    "cuatro_cuatro_cuatro_bg.wasm",
+    "cuatro_cuatro_cuatro.js",
+    "cuatro_cuatro_cuatro.d.ts"
+  ],
+  "module": "cuatro_cuatro_cuatro.js",
+  "types": "cuatro_cuatro_cuatro.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
