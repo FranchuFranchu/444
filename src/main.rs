@@ -30,7 +30,7 @@ fn main() {
                 let turns: u64 = args[1].trim().parse().unwrap();
                 ai_turns += turns;
             };
-            interface.play_ai(0).unwrap();
+            interface.play_ai(-2).unwrap();
         }
         if args[0] == "p" {
             let n = u8::from_str_radix(&args[1].trim(), 16).unwrap();
@@ -48,11 +48,18 @@ fn main() {
         if args[0] == "q" {
             return;
         }
+        if args[0] == "l" {
+            interface.from_base64(&args[1].trim());
+        }
+        if args[0] == "e" {
+            interface = Interface::new();
+        }
         println!(
             "Move: {}\n{}",
             interface.history_len(),
             interface.get_last().pretty()
         );
+        println!("{:?}", interface.to_base64());
         if let Some(WinResult(winner, state)) = interface.winner() {
             println!("{}\n{}", winner, state.pretty());
             ai_turns = 0;

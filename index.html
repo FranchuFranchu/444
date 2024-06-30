@@ -11,6 +11,19 @@
         width: max(3em, 70px);
         height: max(3em, 70px);
       }
+      #main > #buttons {
+        display: flex; 
+        justify-content: center;
+        align-items: center; 
+        gap: 5px
+      }
+      #main {
+        display: flex; 
+        justify-content: center;
+        flex-direction: column;
+        align-items: center; 
+        gap: 5px
+      }
     </style>
   </head>
   <body>
@@ -139,66 +152,22 @@
       }
 
       import init, { Interface, State } from "./pkg/cuatro_cuatro_cuatro.js";
-      Game.save = function(state) {
-        const byteArray = new Uint8Array(16);
-
-        for (let z = 0; z < 4; z++) {
-          for (let y = 0; y < 4; y++) {
-            for (let x = 0; x < 4; x++) {
-              let bit_offset = x + (y % 2) * 4
-              let byte_offset = Math.floor(y / 2) + z * 2
-              let place = state.wasm_clone().get_at(x,y,z)
-              if (place !== undefined) {
-                byteArray[byte_offset+8] |= (place << bit_offset)
-                byteArray[byte_offset] |= (1 << bit_offset)
-              }
-
-            }
-          }
-        }
-        let binaryString = '';
-        for (let i = 0; i < byteArray.length; i++) {
-            binaryString += String.fromCharCode(byteArray[i]);
-        }
-        return btoa(unescape(encodeURIComponent(binaryString)))
+      Game.save = function() {
+        return Game.interface.to_base64();
       }
       Game.save_to_url = function() {
-        let s = Game.save(Game.interface.get_last())
+        let s = Game.save()
         document.getElementById('cargar').value = s
         window.location.hash = "#" + s
       }
       Game.load = function(base64) {
         console.log(base64)
-        let state = new State()
-
-        // Decode the base64 string to a binary string
-        const binaryString = decodeURIComponent(escape(atob(base64)));
-
-        // Create a byte array of the appropriate length
-        const byteArray = new Uint8Array(16);
-
-        // Convert the binary string to a byte array
-        for (let i = 0; i < binaryString.length; i++) {
-            byteArray[i] = binaryString.charCodeAt(i);
+        if(base64.length != 0) {
+          Game.interface.from_base64(base64)
         }
-
-        for (let z = 0; z < 4; z++) {
-          for (let y = 0; y < 4; y++) {
-            for (let x = 0; x < 4; x++) {
-              let bit_offset = Math.trunc(x + (y % 2) * 4)
-              let byte_offset = Math.floor(y / 2) + z * 2
-              let present = (byteArray[byte_offset] & (1 << bit_offset)) != 0
-              let team = (byteArray[byte_offset+8] & (1 << bit_offset)) != 0
-              state = state.set_at(x,y,z,
-                present ? team : undefined
-              )
-            }
-          }
-        }
-        return state
       }
       Game.load_from_field = () => {
-        Game.interface.push(Game.load(document.getElementById('cargar').value))
+        Game.load(document.getElementById('cargar').value)
         Game.update_board()
       }
       init().then(() => {
@@ -206,7 +175,7 @@
         document.getElementById("state").appendChild(Game.new_state_div("main-board"));
         try {
           let s = window.location.hash.slice(1)
-          Game.interface.push(Game.load(s))
+          Game.load(s)
         } catch (e) {
           console.error(e)
         }
@@ -216,7 +185,7 @@
     <div id="main" style="margin: auto 0 auto 0;">
       <div id="state">
       </div>
-      <div id="buttons" style="display: flex; justify-content: center; align-items: center; gap: 5px">
+      <div id="buttons">
         <button onclick="Game.play_ai()">Jugar con IA</button>
         <button onclick="Game.undo()">Deshacer</button>
         <span>Dificultad: </span>
@@ -226,9 +195,15 @@
         <input type="text" id="cargar"/>
         <button onclick="Game.load_from_field()">Cargar</button>
       </div>
-      <div id="winner" style="display: flex; justify-content: center; flex-direction: column; align-items: center; gap: 5px">
+      <div id="winner">
         
       </div>
+      <!--
+      <hr/>
+      <div id="history">
+        <h3>History</h3>
+      </div>
+    -->
     </div>
   </body>
 </html>

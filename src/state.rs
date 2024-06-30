@@ -346,6 +346,11 @@ impl State {
         }
         tot
     }
+    pub fn get_move(self, next: State) -> (u8, u8) {
+        let n = (next.0 & !self.0);
+        let n = n.ilog2() as u8 % 16;
+        (n % 4, n / 4)
+    }
     pub fn choose_next(self, diff: isize) -> Option<State> {
         let dep = if self.count_own() < 10 {
             4 + diff

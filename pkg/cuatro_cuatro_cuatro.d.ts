@@ -8,6 +8,23 @@ export class Interface {
 */
   constructor();
 /**
+* @param {string} b64
+*/
+  from_base64(b64: string): void;
+/**
+* @returns {string}
+*/
+  to_base64(): string;
+/**
+* @param {Uint8Array} array
+* @param {number} len
+*/
+  add_moves(array: Uint8Array, len: number): void;
+/**
+* @returns {Uint8Array}
+*/
+  export_moves(): Uint8Array;
+/**
 * @returns {number}
 */
   history_len(): number;
@@ -103,15 +120,6 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly __wbg_state_free: (a: number) => void;
-  readonly __wbg_get_state_0: (a: number) => number;
-  readonly __wbg_set_state_0: (a: number, b: number) => void;
-  readonly __wbg_get_state_1: (a: number) => number;
-  readonly __wbg_set_state_1: (a: number, b: number) => void;
-  readonly state_empty: () => number;
-  readonly state_wasm_clone: (a: number) => number;
-  readonly state_get_at: (a: number, b: number, c: number, d: number) => number;
-  readonly state_set_at: (a: number, b: number, c: number, d: number, e: number) => number;
   readonly __wbg_interface_free: (a: number) => void;
   readonly __wbg_winresult_free: (a: number) => void;
   readonly __wbg_get_winresult_0: (a: number) => number;
@@ -119,6 +127,10 @@ export interface InitOutput {
   readonly __wbg_get_winresult_1: (a: number) => number;
   readonly __wbg_set_winresult_1: (a: number, b: number) => void;
   readonly interface_new: () => number;
+  readonly interface_from_base64: (a: number, b: number, c: number, d: number) => void;
+  readonly interface_to_base64: (a: number, b: number) => void;
+  readonly interface_add_moves: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly interface_export_moves: (a: number, b: number) => void;
   readonly interface_history_len: (a: number) => number;
   readonly interface_get_last: (a: number) => number;
   readonly interface_player_id: (a: number) => number;
@@ -129,7 +141,19 @@ export interface InitOutput {
   readonly interface_undo_to: (a: number, b: number) => void;
   readonly interface_peek: (a: number, b: number) => number;
   readonly interface_winner: (a: number) => number;
+  readonly __wbg_state_free: (a: number) => void;
+  readonly __wbg_get_state_0: (a: number) => number;
+  readonly __wbg_set_state_0: (a: number, b: number) => void;
+  readonly __wbg_get_state_1: (a: number) => number;
+  readonly __wbg_set_state_1: (a: number, b: number) => void;
+  readonly state_empty: () => number;
+  readonly state_wasm_clone: (a: number) => number;
+  readonly state_get_at: (a: number, b: number, c: number, d: number) => number;
+  readonly state_set_at: (a: number, b: number, c: number, d: number, e: number) => number;
   readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
+  readonly __wbindgen_malloc: (a: number, b: number) => number;
+  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
