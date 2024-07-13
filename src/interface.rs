@@ -1,7 +1,23 @@
+use std::time::Instant;
+
 use wasm_bindgen::prelude::*;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 
 use crate::state::State;
+
+fn difficulty_to_visit(diff: isize) -> usize {
+    // it's roughly linear:
+
+    // 100000 -> 4392ms
+    // 10000 -> 370ms
+    // 1000 -> 36ms
+    // base difficulty will take 1 second on my machine.
+    if diff < 0 {
+        (22768u64 >> -diff).try_into().unwrap()
+    } else {
+        (22768u64 << diff).try_into().unwrap()
+    }
+}
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -17,12 +33,14 @@ pub struct WinResult(pub bool, pub State);
 impl Interface {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
+        if cfg!(all(target_arch = "wasm32", target_os = "unknown")) {
+            std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        }
         Self::default()
     }
     pub fn from_base64(&mut self, b64: &str) -> Result<(), String> {
         let n = URL_SAFE.decode(b64).unwrap();
         let length = u32::from_le_bytes((&n[0..4]).try_into().unwrap()) as usize;
-        dbg!(&n);
         self.add_moves(&n[4..], length)
     }
     pub fn to_base64(&mut self) -> String {
@@ -30,7 +48,6 @@ impl Interface {
         v.extend((self.history_len() as u32).to_le_bytes().into_iter());
         assert!(v.len() == 4);
         v.extend(self.export_moves().into_iter());
-        dbg!(&v);
         URL_SAFE.encode(v)
     }
     pub fn add_moves(&mut self, array: &[u8], len: usize) -> Result<(), String> {
@@ -38,6 +55,7 @@ impl Interface {
             let n = (array[index / 2] >> ((index % 2) * 4)) % 16;
             self.play_at(n % 4, n / 4)?;
         };
+        println!("{:?}", self.move_history.iter().map(|(a, b)| format!("{:x}", a + b * 4)).collect::<Vec<_>>());
         Ok(())
     }
     pub fn export_moves(&mut self) -> Box<[u8]> {
@@ -64,10 +82,22 @@ impl Interface {
     pub fn play_ai(&mut self, diff: isize) -> Result<(), String> {
         let team = self.player_id();
         let state = self.get_last();
+        let visit_amount = difficulty_to_visit(diff);
+        let t = if cfg!(all(target_arch = "wasm32", target_os = "unknown")) {
+            None
+        } else {
+            Some(Instant::now())
+        };
+        
         let new_state = state
             .cond_flip(team)
-            .choose_next(diff)
+            .choose_next(visit_amount)
             .map(|x| x.cond_flip(team));
+        if !cfg!(all(target_arch = "wasm32", target_os = "unknown")) {
+            let t2 = Instant::now();
+            println!("{}: Took {}ms", visit_amount, (t2 - t.unwrap()).as_millis());
+        }
+        
         if let Some(new_state) = new_state {
             let m = state.get_move(new_state);
             self.play_at(m.0, m.1)
@@ -89,10 +119,12 @@ impl Interface {
         self.history.push(state)
     }
     pub fn undo(&mut self) -> Option<State> {
+        self.move_history.pop();
         self.history.pop()
     }
     pub fn undo_to(&mut self, len: usize) {
         self.history.truncate(len);
+        self.move_history.truncate(len);
     }
     pub fn peek(&mut self, step: usize) -> Option<State> {
         self.history.get(step).map(|x| *x)

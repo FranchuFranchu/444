@@ -29,7 +29,7 @@
   <body>
     <script type="module">
       window.Game = {}
-      Game.difficulty = -1
+      Game.difficulty = -2
       function createGrid(cl) {
         // Create the grid container
         const gridContainer = document.createElement('div');
@@ -184,6 +184,7 @@
           console.error(e)
         }
         Game.update_board()
+        Game.update_difficulty()
       });
     </script>
     <div id="main" style="margin: auto 0 auto 0;">
@@ -193,8 +194,8 @@
         <button onclick="Game.play_ai()">Jugar con IA</button>
         <button onclick="Game.undo()">Deshacer</button>
         <span>Dificultad: </span>
-        <span id="difficulty-show">-1</span>
-        <input type="range" name="" oninput="Game.update_difficulty()" id="difficulty" min="-3" max="2">
+        <span id="difficulty-show">?</span>
+        <input type="range" name="" oninput="Game.update_difficulty()" id="difficulty" min="-6" max="6">
         <button onclick="Game.save_to_url()">Guardar</button>
         <input type="text" id="cargar"/>
         <button onclick="Game.load_from_field()">Cargar</button>

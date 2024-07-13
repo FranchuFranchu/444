@@ -62,6 +62,26 @@ impl const Shr<u64> for State {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct VisitState {
+    min_reached_depth: usize,
+    remaining: usize,
+    has_more_children: bool,
+}
+#[derive(Clone, Debug)]
+pub struct ScoreResult {
+    next_move: Option<State>,
+    best_endstate: State,
+    score: f64,
+}
+
+impl ScoreResult {
+    fn with_next_move(mut self, m: State) -> Self {
+        self.next_move = Some(m);
+        self
+    }
+}
+
 impl core::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut p = self.0;
@@ -292,28 +312,60 @@ impl State {
             }
         }))
     }
-    pub fn score(self, eval: &impl Fn(State) -> f64, depth: usize, own: bool) -> f64 {
+    pub fn score(self, eval: &impl Fn(State) -> f64, depth: usize, own: bool, visit: &mut VisitState) -> ScoreResult {
         if self.did_we_win() {
-            return INFINITY;
+            return ScoreResult {
+                next_move: None,
+                best_endstate: self,
+                score: INFINITY,
+            }
         }
         if self.flip_team().did_we_win() {
-            return -INFINITY;
+            return ScoreResult {
+                next_move: None,
+                best_endstate: self,
+                score: -INFINITY,
+            }
         }
-        if depth == 0 {
-            return eval(self);
+        visit.min_reached_depth = visit.min_reached_depth.min(visit.min_reached_depth);
+        if depth == 0 || (visit.remaining == 0 && depth < visit.min_reached_depth) {
+            visit.has_more_children = true;
+            return ScoreResult {
+                next_move: None,
+                best_endstate: self,
+                score: eval(self),
+            }
         } else {
+            if visit.remaining != 0 {
+                visit.remaining -= 1;
+            }
             if own {
                 self.children_own()
-                    .map(|x| x.score(eval, depth - 1, !own))
-                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .map(|x| x.score(eval, depth - 1, !own, visit).with_next_move(x))
+                    .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
                     .unwrap()
             } else {
                 self.children_they()
-                    .map(|x| x.score(eval, depth - 1, !own))
-                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .map(|x| x.score(eval, depth - 1, !own, visit).with_next_move(x))
+                    .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
                     .unwrap()
             }
         }
+    }
+    fn idfs_score(self, visit: usize, eval: &impl Fn(State) -> f64, own: bool) -> ScoreResult {
+        for depth in 0.. {  
+            let mut visit = VisitState {
+                min_reached_depth: 0,
+                remaining: visit,
+                has_more_children: false,
+            };
+            let score = self.score(eval, depth, own, &mut visit);
+            if visit.remaining == 0 || visit.has_more_children == false {
+                println!("Halted on depth: {}", depth - visit.min_reached_depth);
+                return score;
+            }
+        };
+        panic!("Broke from depth loop :( {}", visit);
     }
     pub fn did_we_win(self) -> bool {
         for i in Self::lines() {
@@ -347,25 +399,12 @@ impl State {
         tot
     }
     pub fn get_move(self, next: State) -> (u8, u8) {
-        let n = (next.0 & !self.0);
+        let n = next.0 & !self.0;
         let n = n.ilog2() as u8 % 16;
         (n % 4, n / 4)
     }
-    pub fn choose_next(self, diff: isize) -> Option<State> {
-        let dep = if self.count_own() < 10 {
-            4 + diff
-        } else if self.count_own() < 15 {
-            5 + diff
-        } else if self.count_own() < 25 {
-            6 + diff
-        } else {
-            7 + diff
-        };
-        self.children_own().max_by(|a, b| {
-            a.score(&|x| x.eval(), dep.unsigned_abs(), false)
-                .partial_cmp(&b.score(&|x| x.eval(), dep.unsigned_abs(), false))
-                .unwrap()
-        })
+    pub fn choose_next(self, visit: usize) -> Option<State> {
+        self.idfs_score(visit, &|x| x.eval(), true).next_move
     }
     pub fn winner(self) -> Option<bool> {
         if self.did_we_win() {

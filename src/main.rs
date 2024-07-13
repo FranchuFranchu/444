@@ -12,6 +12,7 @@ use crate::interface::{Interface, WinResult};
 fn main() {
     let mut interface = Interface::new();
     let mut ai_turns = 0;
+    let mut difficulty = 0;
     loop {
         let args: Vec<String> = if ai_turns == 0 {
             print!("> ");
@@ -30,7 +31,10 @@ fn main() {
                 let turns: u64 = args[1].trim().parse().unwrap();
                 ai_turns += turns;
             };
-            interface.play_ai(-2).unwrap();
+            interface.play_ai(difficulty).unwrap();
+        }
+        if args[0] == "d" {
+            difficulty = args[1].trim().parse().unwrap();
         }
         if args[0] == "p" {
             let n = u8::from_str_radix(&args[1].trim(), 16).unwrap();
