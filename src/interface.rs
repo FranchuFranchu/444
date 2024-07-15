@@ -1,11 +1,11 @@
 use std::time::Instant;
 
-use wasm_bindgen::prelude::*;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use wasm_bindgen::prelude::*;
 
 use crate::state::State;
 
-fn difficulty_to_visit(diff: isize) -> usize {
+fn difficulty_to_visit(diff: isize) -> Option<usize> {
     // it's roughly linear:
 
     // 100000 -> 4392ms
@@ -13,9 +13,9 @@ fn difficulty_to_visit(diff: isize) -> usize {
     // 1000 -> 36ms
     // base difficulty will take 1 second on my machine.
     if diff < 0 {
-        (22768u64 >> -diff).try_into().unwrap()
+        (22768u64 >> -diff).try_into().ok()
     } else {
-        (22768u64 << diff).try_into().unwrap()
+        (22768u64 << diff).try_into().ok()
     }
 }
 
@@ -39,36 +39,43 @@ impl Interface {
         Self::default()
     }
     pub fn from_base64(&mut self, b64: &str) -> Result<(), String> {
-        let n = URL_SAFE.decode(b64).unwrap();
-        let length = u32::from_le_bytes((&n[0..4]).try_into().unwrap()) as usize;
+        let n = URL_SAFE.decode(b64).map_err(|x| format!("{}", x))?;
+        let length =
+            u32::from_le_bytes((&n[0..4]).try_into().map_err(|x| format!("{}", x))?) as usize;
         self.add_moves(&n[4..], length)
     }
-    pub fn to_base64(&mut self) -> String {
+    pub fn to_base64(&mut self) -> Option<String> {
         let mut v = vec![];
         v.extend((self.history_len() as u32).to_le_bytes().into_iter());
         assert!(v.len() == 4);
-        v.extend(self.export_moves().into_iter());
-        URL_SAFE.encode(v)
+        v.extend(self.export_moves()?.into_iter());
+        Some(URL_SAFE.encode(v))
     }
     pub fn add_moves(&mut self, array: &[u8], len: usize) -> Result<(), String> {
         for index in 0..len {
             let n = (array[index / 2] >> ((index % 2) * 4)) % 16;
             self.play_at(n % 4, n / 4)?;
-        };
-        println!("{:?}", self.move_history.iter().map(|(a, b)| format!("{:x}", a + b * 4)).collect::<Vec<_>>());
+        }
+        println!(
+            "{:?}",
+            self.move_history
+                .iter()
+                .map(|(a, b)| format!("{:x}", a + b * 4))
+                .collect::<Vec<_>>()
+        );
         Ok(())
     }
-    pub fn export_moves(&mut self) -> Box<[u8]> {
+    pub fn export_moves(&mut self) -> Option<Box<[u8]>> {
         let mut arr = vec![];
         for (index, (x, y)) in self.move_history.iter().enumerate() {
             if index % 2 == 0 {
                 arr.push(x | y << 2);
             } else {
-                let a = arr.last_mut().unwrap();
+                let a = arr.last_mut()?;
                 *a |= (x << 4) | (y << 6)
             }
         }
-        arr.into_boxed_slice()
+        Some(arr.into_boxed_slice())
     }
     pub fn history_len(&self) -> usize {
         self.history.len()
@@ -82,13 +89,13 @@ impl Interface {
     pub fn play_ai(&mut self, diff: isize) -> Result<(), String> {
         let team = self.player_id();
         let state = self.get_last();
-        let visit_amount = difficulty_to_visit(diff);
+        let visit_amount = difficulty_to_visit(diff).ok_or("Invalid difficulty".to_string())?;
         let t = if cfg!(all(target_arch = "wasm32", target_os = "unknown")) {
             None
         } else {
             Some(Instant::now())
         };
-        
+
         let new_state = state
             .cond_flip(team)
             .choose_next(visit_amount)
@@ -97,7 +104,7 @@ impl Interface {
             let t2 = Instant::now();
             println!("{}: Took {}ms", visit_amount, (t2 - t.unwrap()).as_millis());
         }
-        
+
         if let Some(new_state) = new_state {
             let m = state.get_move(new_state);
             self.play_at(m.0, m.1)

@@ -5,8 +5,6 @@ pub mod state;
 
 use std::io::Write;
 
-use crate::state::State;
-
 use crate::interface::{Interface, WinResult};
 
 fn main() {
@@ -31,14 +29,18 @@ fn main() {
                 let turns: u64 = args[1].trim().parse().unwrap();
                 ai_turns += turns;
             };
-            interface.play_ai(difficulty).unwrap();
+            if let Err(e) = interface.play_ai(difficulty) {
+                println!("Error: {}", e);
+            }
         }
         if args[0] == "d" {
             difficulty = args[1].trim().parse().unwrap();
         }
         if args[0] == "p" {
             let n = u8::from_str_radix(&args[1].trim(), 16).unwrap();
-            interface.play_at(n % 4, n / 4).unwrap();
+            if let Err(e) = interface.play_at(n % 4, n / 4) {
+                println!("{}", e);
+            }
         }
         if args[0] == "u" {
             let rt = if args.len() > 1 && args[1].trim().len() > 0 {
@@ -53,7 +55,9 @@ fn main() {
             return;
         }
         if args[0] == "l" {
-            interface.from_base64(&args[1].trim());
+            if let Err(e) = interface.from_base64(&args[1].trim()) {
+                print!("{}", e);
+            }
         }
         if args[0] == "e" {
             interface = Interface::new();

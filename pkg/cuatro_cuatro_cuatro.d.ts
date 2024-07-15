@@ -12,18 +12,18 @@ export class Interface {
 */
   from_base64(b64: string): void;
 /**
-* @returns {string}
+* @returns {string | undefined}
 */
-  to_base64(): string;
+  to_base64(): string | undefined;
 /**
 * @param {Uint8Array} array
 * @param {number} len
 */
   add_moves(array: Uint8Array, len: number): void;
 /**
-* @returns {Uint8Array}
+* @returns {Uint8Array | undefined}
 */
-  export_moves(): Uint8Array;
+  export_moves(): Uint8Array | undefined;
 /**
 * @returns {number}
 */

@@ -21,3 +21,9 @@ fn _count() {
         println!("{:?} movimientos, dos equipos: {:?}", depth + 1, set.len());
     }
 }
+
+pub fn print_lines() {
+    for i in State::lines() {
+        print!("State({:#018x}, {:#018x}),\n", i.0, i.1)
+    }
+}

@@ -82,6 +82,14 @@ impl ScoreResult {
     }
 }
 
+fn cond_flip(x: bool) -> f64 {
+    if x {
+        1.
+    } else {
+        -1.
+    }
+}
+
 impl core::fmt::Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut p = self.0;
@@ -166,6 +174,10 @@ impl State {
     pub fn is_empty(self) -> bool {
         self.0.count_ones() == 0
     }
+    pub fn is_full(self) -> bool {
+        self.0.count_zeros() == 0
+    }
+    pub const LINES: [Self; 76] = include!("lines.fragment.rs");
     pub fn lines() -> impl Iterator<Item = Self> {
         std::iter::from_coroutine(move || {
             for x in 0..4 {
@@ -252,6 +264,19 @@ impl State {
             ()
         })
     }
+    pub fn planes() -> impl Iterator<Item = Self> {
+        std::iter::from_coroutine(move || {
+            for x in 0..4 {
+                yield Self::x_mask(x)
+            }
+            for y in 0..4 {
+                yield Self::y_mask(y);
+            }
+            for z in 0..4 {
+                yield Self::z_mask(z);
+            }
+        })
+    }
     pub fn play_at(self, x: u8, y: u8) -> Option<State> {
         for z in 0..4 {
             if (self & Self::xyz_mask(x, y, z)).is_empty() {
@@ -312,65 +337,78 @@ impl State {
             }
         }))
     }
-    pub fn score(self, eval: &impl Fn(State) -> f64, depth: usize, own: bool, visit: &mut VisitState) -> ScoreResult {
-        if self.did_we_win() {
-            return ScoreResult {
-                next_move: None,
-                best_endstate: self,
-                score: INFINITY,
-            }
-        }
-        if self.flip_team().did_we_win() {
-            return ScoreResult {
-                next_move: None,
-                best_endstate: self,
-                score: -INFINITY,
-            }
-        }
+    pub fn negamax(
+        self,
+        eval: &impl Fn(State) -> f64,
+        depth: usize,
+        own: bool,
+        mut alpha: f64,
+        beta: f64,
+        visit: &mut VisitState,
+    ) -> ScoreResult {
         visit.min_reached_depth = visit.min_reached_depth.min(visit.min_reached_depth);
-        if depth == 0 || (visit.remaining == 0 && depth < visit.min_reached_depth) {
+        if depth == 0 || self.is_full() || self.flip_team().did_we_win() || self.did_we_win() {
             visit.has_more_children = true;
             return ScoreResult {
                 next_move: None,
                 best_endstate: self,
-                score: eval(self),
-            }
+                score: eval(self) * cond_flip(own),
+            };
         } else {
             if visit.remaining != 0 {
                 visit.remaining -= 1;
             }
-            if own {
-                self.children_own()
-                    .map(|x| x.score(eval, depth - 1, !own, visit).with_next_move(x))
-                    .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
-                    .unwrap()
+
+            let iterator: Box<dyn Iterator<Item = Self>> = if !own {
+                Box::new(self.children_they())
             } else {
-                self.children_they()
-                    .map(|x| x.score(eval, depth - 1, !own, visit).with_next_move(x))
-                    .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
-                    .unwrap()
+                Box::new(self.children_own())
+            };
+            let mut value: ScoreResult = ScoreResult {
+                next_move: None,
+                best_endstate: self,
+                score: -INFINITY,
+            };
+            for i in iterator {
+                let mut i = i
+                    .negamax(eval, depth - 1, !own, -beta, -alpha, visit)
+                    .with_next_move(i);
+                i.score = -i.score;
+                if value.score < i.score {
+                    value = i;
+                } else if value.score == i.score {
+                    // Prioritize late game plays
+                    if value.best_endstate.count_own() < i.best_endstate.count_own() {
+                        value = i;
+                    }
+                }
+                alpha = alpha.max(value.score.clone());
+                if alpha >= beta {
+                    break;
+                }
             }
+            value
         }
     }
     fn idfs_score(self, visit: usize, eval: &impl Fn(State) -> f64, own: bool) -> ScoreResult {
-        for depth in 0.. {  
+        for depth in 0..64 {
             let mut visit = VisitState {
                 min_reached_depth: 0,
                 remaining: visit,
                 has_more_children: false,
             };
-            let score = self.score(eval, depth, own, &mut visit);
-            if visit.remaining == 0 || visit.has_more_children == false {
+            let score = self.negamax(eval, depth, own, -INFINITY, INFINITY, &mut visit);
+            if visit.remaining == 0 || visit.has_more_children == false || depth == 63 {
                 println!("Halted on depth: {}", depth - visit.min_reached_depth);
                 return score;
             }
-        };
+        }
         panic!("Broke from depth loop :( {}", visit);
     }
     pub fn did_we_win(self) -> bool {
-        for i in Self::lines() {
-            let line = self & i;
-            if line.count_own() == 4 {
+        let o = self.0 & self.1;
+        for i in Self::LINES {
+            if o & i.0 == i.0 {
                 return true;
             }
         }
@@ -378,7 +416,7 @@ impl State {
     }
     pub fn eval(self) -> f64 {
         let mut tot = 0f64;
-        for i in Self::lines() {
+        for i in Self::LINES {
             let line = self & i;
             let n_our = line.count_own();
             let n_they = line.flip_team().count_own();
@@ -396,6 +434,13 @@ impl State {
             };
             tot += score;
         }
+        /*for i in Self::planes() {
+            let line = self & i;
+            let n_our = line.count_own();
+            let n_they = line.flip_team().count_own();
+            tot += n_our as f64 * (1. / 16.);
+            tot -= n_they as f64 *  (1. / 16.);
+        }*/
         tot
     }
     pub fn get_move(self, next: State) -> (u8, u8) {
@@ -404,7 +449,10 @@ impl State {
         (n % 4, n / 4)
     }
     pub fn choose_next(self, visit: usize) -> Option<State> {
-        self.idfs_score(visit, &|x| x.eval(), true).next_move
+        let sc = self.idfs_score(visit, &|x| x.eval(), true);
+        dbg!(&sc.score);
+        println!("{}", sc.best_endstate.pretty());
+        sc.next_move
     }
     pub fn winner(self) -> Option<bool> {
         if self.did_we_win() {
